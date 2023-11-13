@@ -73,7 +73,7 @@ def preprocess_and_visualize(
 
 def detect_hand_orientation_contour_convex_hull(image):
     # Preprocessing the image to segment the hand
-    preprocessed_image = preprocess_and_visualize(image, visualize=False)
+    preprocessed_image = preprocess_and_visualize(image, visualize=True)
 
     # Convert to grayscale
     gray = cv2.cvtColor(preprocessed_image, cv2.COLOR_BGR2GRAY)
