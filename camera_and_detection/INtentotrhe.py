@@ -113,8 +113,6 @@ def detect_hand_orientation_contour_convex_hull(image):
                 else:
                     pass
 
-        # [Resto del código para mostrar el ángulo, etc.]
-
     return preprocessed_image
 
 
