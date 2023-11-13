@@ -31,6 +31,38 @@ def calculate_normal_vector(p1, p2, p3):
     return normal / norm
 
 
+def get_pointing_direction(green_vector):
+    pointing_description = ""
+    pointing_tolerance = 0.2  # Adjust as needed for sensitivity
+
+    # Normalized vectors for the eight primary and secondary directions
+    direction_vectors = {
+        "Down": np.array([0, 1, 0]),
+        "Up": np.array([0, -1, 0]),
+        "Left": np.array([-1, 0, 0]),
+        "Right": np.array([1, 0, 0]),
+        "Down-Right": np.array([1, 1, 0]) / np.sqrt(2),
+        "Down-Left": np.array([-1, 1, 0]) / np.sqrt(2),
+        "Up-Right": np.array([1, -1, 0]) / np.sqrt(2),
+        "Up-Left": np.array([-1, -1, 0]) / np.sqrt(2),
+        "Towards": np.array([0, 0, -1]),
+        "Away": np.array([0, 0, 1]),
+    }
+
+    max_dot = -1.0
+    for direction, vector in direction_vectors.items():
+        dot_product = np.dot(green_vector, vector)
+        if dot_product > max_dot:
+            max_dot = dot_product
+            if dot_product > 1 - pointing_tolerance:
+                pointing_description = "Pointing " + direction
+
+    if not pointing_description:
+        pointing_description = "Pointing Direction Unclear"
+
+    return pointing_description
+
+
 # Function to provide a description based on the normal vector
 def get_hand_description(normal_vector):
     description = ""
@@ -103,6 +135,8 @@ while cap.isOpened():
             base_index = points[5]
             base_pinky = points[17]
             wrist = points[0]
+            middle_fingertip = points[12]
+            middle_knuckle = points[9]
 
             # Calculate the centroid of the triangle
             centroid = (
@@ -114,12 +148,10 @@ while cap.isOpened():
             # Calculate the normal vector using the centroid
             normal_vector = calculate_normal_vector(base_index, base_pinky, centroid)
 
-            previous_normal_vector = np.array(
-                [0, 0, 1]
-            )  # Initial normal vector assuming palm facing away
-            confidence_threshold_degrees = (
-                30.0  # Angle threshold in degrees for confidence checking
-            )
+            green_vector = np.subtract(middle_knuckle, wrist)
+            green_vector_normalized = green_vector / np.linalg.norm(green_vector)
+
+            pointing_direction = get_pointing_direction(green_vector_normalized)
 
             # Visualize the centroid
             cv2.circle(frame, (centroid[0], centroid[1]), 5, (0, 255, 255), -1)
@@ -131,8 +163,19 @@ while cap.isOpened():
             )
             cv2.line(frame, (centroid[0], centroid[1]), normal_point, (0, 0, 255), 2)
 
+            # Visualize the green line
+            cv2.line(
+                frame,
+                (wrist[0], wrist[1]),
+                (middle_knuckle[0], middle_knuckle[1]),
+                (0, 255, 0),
+                2,
+            )
+
             # Get hand description based on the normal vector
             hand_description = get_hand_description(normal_vector)
+
+            hand_description += " and is " + pointing_direction
 
             # Display the hand description
             cv2.putText(
