@@ -5,7 +5,7 @@ import numpy as np
 mp_hands = mp.solutions.hands
 hands = mp_hands.Hands()
 mp_drawing = mp.solutions.drawing_utils
-teal_color = (255, 228, 225)  # RGB color for teal
+teal_color = (0, 128, 128)  # RGB color for teal
 
 cap = cv2.VideoCapture(0)
 
@@ -50,7 +50,6 @@ while cap.isOpened():
 
             cv2.imshow("Segmented Hand", segmented_hand)
 
-    cv2.imshow("MediaPipe Hands", frame)
     if cv2.waitKey(1) & 0xFF == ord("q"):
         break
 
