@@ -1,58 +1,88 @@
+import tkinter as tk
+import customtkinter as ctk
 import cv2
-import numpy as np
-from keras.preprocessing.image import img_to_array
+from PIL import Image, ImageTk
+from hand_detection import HandDetector
+from threading import Thread
+import time
 
 
-def preprocess_image(image):
-    # Convert to YCrCb color space
-    ycrcb_img = cv2.cvtColor(image, cv2.COLOR_BGR2YCrCb)
+class Application(ctk.CTk):
+    def __init__(self):
+        super().__init__()
+        self.title("HCI Detection Interface")
+        self.geometry("1366x768")  # Fullscreen for a 1366x768 resolution
 
-    # Assuming you have a background image to subtract
-    # background_img = cv2.imread('path_to_background_image.jpg')
-    # background_ycrcb = cv2.cvtColor(background_img, cv2.COLOR_BGR2YCrCb)
-    # ycrcb_img = cv2.absdiff(ycrcb_img, background_ycrcb)
+        # Initialize HandDetector
+        self.hand_detector = HandDetector()
 
-    # Split into 3 channels
-    y, cr, cb = cv2.split(ycrcb_img)
+        # Setup the camera capture
+        self.video_capture = cv2.VideoCapture(0)
 
-    # Thresholding each channel to get binary masks
-    _, binary_y = cv2.threshold(y, 80, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-    _, binary_cr = cv2.threshold(cr, 133, 173, cv2.THRESH_BINARY)
-    _, binary_cb = cv2.threshold(cb, 77, 127, cv2.THRESH_BINARY)
+        # Create frames for each section
+        left_frame = ctk.CTkFrame(master=self, width=200, height=768)
+        left_frame.pack(side="left", fill="y")
 
-    # Morphological operations
-    kernel = np.ones((3, 3), np.uint8)
-    morph_y = cv2.morphologyEx(binary_y, cv2.MORPH_CLOSE, kernel)
-    morph_cr = cv2.morphologyEx(binary_cr, cv2.MORPH_CLOSE, kernel)
-    morph_cb = cv2.morphologyEx(binary_cb, cv2.MORPH_CLOSE, kernel)
+        camera_frame = ctk.CTkFrame(
+            master=self, width=926, height=768
+        )  # Adjust the size to better fit the window
+        camera_frame.pack(side="left", fill="both", expand=True)
 
-    # Combining the masks
-    combined_binary = cv2.bitwise_and(morph_cr, morph_cb)
-    combined_binary = cv2.bitwise_and(combined_binary, morph_y)
+        right_frame = ctk.CTkFrame(master=self, width=240, height=768)
+        right_frame.pack(side="left", fill="y")
 
-    # More morphology on combined mask if needed
-    combined_morph = cv2.morphologyEx(combined_binary, cv2.MORPH_CLOSE, kernel)
+        # Dropdown menu for layer selection, positioned at the bottom of left_frame
+        layer_selector_label = ctk.CTkLabel(master=left_frame, text="Layer Selector")
+        layer_selector_label.pack(side="bottom", padx=10, pady=10)
 
-    # Apply the mask to get the segmented hand
-    hand_segment = cv2.bitwise_and(image, image, mask=combined_morph)
+        layer_selector = ctk.CTkOptionMenu(
+            master=left_frame, values=["Layer 1", "Layer 2", "Camera Only"]
+        )
+        layer_selector.pack(side="bottom", padx=10, pady=10)
 
-    # Optional: Canny edge detection for contouring
-    # edges = cv2.Canny(hand_segment, 100, 200)
+        # Title and Information labels in the right_frame
+        title_label = ctk.CTkLabel(master=right_frame, text="Title", font=("Arial", 24))
+        title_label.pack(pady=10)
 
-    # Resize for CNN input and normalize
-    resized = cv2.resize(
-        hand_segment, (224, 224)
-    )  # Example size, adjust to your CNN input
-    cnn_input = img_to_array(resized)
-    cnn_input = np.expand_dims(cnn_input, axis=0)
-    cnn_input /= 255.0
+        information_label = ctk.CTkLabel(
+            master=right_frame, text="Information", font=("Arial", 16)
+        )
+        information_label.pack(pady=10)
 
-    return cnn_input
+        # Camera Label
+        self.camera_label = ctk.CTkLabel(master=camera_frame)
+        self.camera_label.pack(expand=True)
+
+        self.video_loop()  # Start the video loop
+
+    def video_loop(self):
+        ret, frame = self.video_capture.read()
+        if ret:
+            # Process the frame through HandDetector
+            frame = self.hand_detector.process(frame)
+            # Convert the frame to a format Tkinter can use
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            im = Image.fromarray(frame)
+            img = ImageTk.PhotoImage(image=im)
+            # Update the GUI with the new image
+            self.camera_label.configure(image=img)
+            self.camera_label.image = img
+
+    # Schedule the next 'video_loop' call
+    self.after(10, self.video_loop)  # 10 ms delay for roughly 100 frames per second
+
+    def update_image(self, img):
+        # Update the camera_label with the new image
+        self.camera_label.configure(image=img)
+        self.camera_label.image = img
+
+    def on_closing(self):
+        self.video_capture.release()
+        self.hand_detector.release()
+        self.destroy()
 
 
-# Example usage
-# Load an image
-image = cv2.imread("path_to_your_image.jpg")
-preprocessed_image = preprocess_image(image)
-
-# Now you can feed 'preprocessed_image' to your CNN for further processing
+# Create the main window and run the application
+app = Application()
+app.protocol("WM_DELETE_WINDOW", app.on_closing)  # Ensure the app closes cleanly
+app.mainloop()
